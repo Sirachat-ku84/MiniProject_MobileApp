@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Alert, SafeAreaView } from 'react-native';
+import { Alert, View } from 'react-native';
 import BottomTabs from './src/components/BottomTabs';
 import Header from './src/components/Header';
 import { categories } from './src/data';
@@ -95,7 +95,7 @@ export default function App() {
     : page === 'bill' ? 'รายการที่สั่งแล้ว แยกตามรอบ' : 'รายการที่ส่งมาก่อนจะแสดงก่อน';
 
   return (
-    <SafeAreaView style={styles.root}>
+    <View style={styles.root}>
       <StatusBar style="dark" backgroundColor={colors.bg} />
       <Header title={title} subtitle={subtitle} />
 
@@ -119,6 +119,6 @@ export default function App() {
       {page === 'kitchen' && <KitchenScreen orders={orders} onUpdateStatus={updateStatus} />}
 
       <BottomTabs page={page} selectedTable={selectedTable} onChangePage={setPage} />
-    </SafeAreaView>
+    </View>
   );
 }

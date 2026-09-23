@@ -1,8 +1,20 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StatusBar, StyleSheet } from 'react-native';
+
+export const topInset = Platform.select({
+  ios: 56,
+  android: (StatusBar.currentHeight ?? 24) + 10,
+  default: 24,
+});
 
 export const colors = { bg: '#F8F5EF', card: '#FFFDF9', text: '#3E352D', muted: '#81766B', border: '#E9E0D5', green: '#52745C', pale: '#E7EFE7', peach: '#FFF3E7' };
 export const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg }, body: { flex: 1 },
+  root: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingTop: topInset,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+  },
+  body: { flex: 1 },
   header: { paddingHorizontal: 22, paddingTop: 25, paddingBottom: 17 },
   brand: { color: colors.green, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10 },
   title: { color: colors.text, fontSize: 28, fontWeight: '700' }, subtitle: { color: colors.muted, fontSize: 14, marginTop: 4 },
