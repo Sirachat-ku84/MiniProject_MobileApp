@@ -1,2 +1,5 @@
-# MiniProject_MobileApp
-group work 
+works group
+
+1.
+2.นายศิรชัช วุ่นซิ้ว 6721651840
+3.
