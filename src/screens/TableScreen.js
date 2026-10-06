@@ -1,9 +1,7 @@
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from '../theme';
 
-const tables = Array.from({ length: 15 }, (_, index) => index + 1);
-
-export default function TableScreen({ openTables, onSelectTable }) {
+export default function TableScreen({ tables, openTables, onSelectTable }) {
   return (
     <View style={styles.body}>
       <View style={styles.legend}>
@@ -13,14 +11,14 @@ export default function TableScreen({ openTables, onSelectTable }) {
       <FlatList
         data={tables}
         numColumns={3}
-        keyExtractor={String}
+        keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.tableList}
         renderItem={({ item }) => {
-          const busy = openTables.includes(item);
+          const busy = openTables.includes(item.id);
           return (
-            <TouchableOpacity style={[styles.table, busy && styles.busyTable]} onPress={() => onSelectTable(item)}>
+            <TouchableOpacity style={[styles.table, busy && styles.busyTable]} onPress={() => onSelectTable(item.id)}>
               <Text style={styles.tableIcon}>⌂</Text>
-              <Text style={styles.tableName}>โต๊ะ {String(item).padStart(2, '0')}</Text>
+              <Text style={styles.tableName}>โต๊ะ {String(item.id).padStart(2, '0')}</Text>
               <Text style={[styles.tableStatus, busy && styles.busyText]}>{busy ? 'มีบิลอยู่' : 'ว่าง'}</Text>
             </TouchableOpacity>
           );
