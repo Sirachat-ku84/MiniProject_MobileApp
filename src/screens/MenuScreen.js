@@ -1,9 +1,8 @@
 import { FlatList, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Button from '../components/Button';
-import { categories, menu } from '../data';
 import { styles } from '../theme';
 
-export default function MenuScreen({ category, onChangeCategory, cart, orders, onAddFood, onChangePage }) {
+export default function MenuScreen({ categories, category, onChangeCategory, cart, orders, menuItems, onAddFood, onChangePage }) {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -16,7 +15,7 @@ export default function MenuScreen({ category, onChangeCategory, cart, orders, o
         ))}
       </ScrollView>
       <FlatList
-        data={menu.filter((item) => item.category === category)}
+        data={menuItems.filter((item) => item.category === category)}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
