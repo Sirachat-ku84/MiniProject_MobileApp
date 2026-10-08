@@ -5,9 +5,11 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import BottomTabs from './src/components/BottomTabs';
 import Header from './src/components/Header';
 import BillScreen from './src/screens/BillScreen';
+import BillHistoryScreen from './src/screens/BillHistoryScreen';
 import CartScreen from './src/screens/CartScreen';
 import KitchenScreen from './src/screens/KitchenScreen';
 import MenuScreen from './src/screens/MenuScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
 import TableScreen from './src/screens/TableScreen';
 import { colors, styles } from './src/theme';
 import { initializeDatabase } from './src/database';
@@ -19,6 +21,9 @@ function RestaurantApp() {
   const [category, setCategory] = useState(null);
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [historicalOrders, setHistoricalOrders] = useState([]);
+  const [billHistory, setBillHistory] = useState([]);
+  const [viewedBill, setViewedBill] = useState(null);
   const [tableRows, setTableRows] = useState([]);
   const [openTables, setOpenTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -30,7 +35,7 @@ function RestaurantApp() {
     let mounted = true;
     async function loadDatabase() {
       try {
-        const [savedOrders, savedMenu, savedCategories, savedCart, savedBills, savedTables] = await Promise.all([
+        const [savedOrders, savedMenu, savedCategories, savedCart, savedBills, savedTables, savedHistory] = await Promise.all([
           db.getAllAsync(`
             SELECT d.id_detail AS id, b.id_table AS "table", d.id_menu AS menuId,
               m.name, d.unit_price AS price, m.icon, d.quantity, d.note,
@@ -48,10 +53,22 @@ function RestaurantApp() {
           db.getAllAsync('SELECT table_number AS "table", menu_id AS menuId, name, price, icon, quantity, note FROM cart_items ORDER BY table_number, rowid'),
           db.getAllAsync("SELECT id_table AS table_number FROM Bill WHERE status = 'open' ORDER BY id_table"),
           db.getAllAsync('SELECT id_table AS id, seat FROM Restaurant_tables ORDER BY id_table'),
+          db.getAllAsync(`
+            SELECT b.id_bill AS id, b.id_table AS "table", b.open_at AS openedAt,
+              b.close_at AS closedAt, COALESCE(SUM(d.quantity), 0) AS itemCount,
+              COALESCE(SUM(d.quantity * d.unit_price), 0) AS total
+            FROM Bill b
+            LEFT JOIN Order_Round r ON r.id_bill = b.id_bill
+            LEFT JOIN Order_Detail d ON d.id_round = r.id_round
+            WHERE b.status = 'paid'
+            GROUP BY b.id_bill
+            ORDER BY b.close_at DESC, b.open_at DESC
+          `),
         ]);
         if (!mounted) return;
         setOrders(savedOrders);
         setOpenTables(savedBills.map((item) => item.table_number));
+        setBillHistory(savedHistory);
         setTableRows(savedTables);
         setMenuItems(savedMenu.map((item) => ({ ...item, price: Number(item.price) })));
         setCategories(savedCategories);
@@ -192,24 +209,87 @@ function RestaurantApp() {
     }
   }
 
+  async function openHistoricalBill(bill) {
+    try {
+      const savedOrders = await db.getAllAsync(`
+        SELECT d.id_detail AS id, b.id_table AS "table", d.id_menu AS menuId,
+          m.name, d.unit_price AS price, m.icon, d.quantity, d.note,
+          r.round_number AS round, d.status, d.id_round AS roundId,
+          CASE WHEN length(r.order_at) >= 16 THEN substr(r.order_at, 12, 5) ELSE r.order_at END AS time
+        FROM Order_Detail d
+        JOIN Menu m ON m.id_menu = d.id_menu
+        JOIN Order_Round r ON r.id_round = d.id_round
+        JOIN Bill b ON b.id_bill = r.id_bill
+        WHERE b.id_bill = ?
+        ORDER BY r.order_at, d.rowid
+      `, bill.id);
+      setViewedBill(bill);
+      setHistoricalOrders(savedOrders);
+      setPage('history-bill');
+    } catch (error) {
+      console.error('Failed to load historical bill', error);
+      Alert.alert('เปิดประวัติบิลไม่สำเร็จ', 'อ่านรายละเอียดบิลจากฐานข้อมูลไม่ได้');
+    }
+  }
+
+  function resetDatabase() {
+    Alert.alert(
+      'รีเซ็ตฐานข้อมูล',
+      'ข้อมูลบิล ออเดอร์ และตะกร้าทั้งหมดจะถูกลบ ส่วนเมนู หมวดหมู่ และโต๊ะจะยังอยู่ ต้องการดำเนินการต่อหรือไม่?',
+      [
+        { text: 'ยกเลิก', style: 'cancel' },
+        { text: 'รีเซ็ต', style: 'destructive', onPress: async () => {
+          try {
+            await db.withTransactionAsync(async () => {
+              await db.runAsync('DELETE FROM cart_items');
+              await db.runAsync('DELETE FROM Order_Detail');
+              await db.runAsync('DELETE FROM Order_Round');
+              await db.runAsync('DELETE FROM Bill');
+            });
+            setOrders([]);
+            setHistoricalOrders([]);
+            setBillHistory([]);
+            setViewedBill(null);
+            setCart([]);
+            setOpenTables([]);
+            setSelectedTable(null);
+            setPage('tables');
+            Alert.alert('รีเซ็ตสำเร็จ', 'ล้างข้อมูลบิล ออเดอร์ และตะกร้าแล้ว');
+          } catch (error) {
+            console.error('Failed to reset local database', error);
+            Alert.alert('รีเซ็ตไม่สำเร็จ', 'ลบข้อมูลจากฐานข้อมูลไม่ได้');
+          }
+        } },
+      ],
+    );
+  }
+
   function closeBill() {
     const total = tableOrders.reduce((sum, item) => sum + item.price * item.quantity, 0);
     Alert.alert(`ปิดบิลโต๊ะ ${selectedTable}`, `ยอดรวม ${total.toFixed(2)} บาท`, [
       { text: 'ยกเลิก', style: 'cancel' },
       { text: 'ยืนยัน', onPress: async () => {
+        let paidBill;
         try {
           await db.withTransactionAsync(async () => {
             const bill = await db.getFirstAsync(
               "SELECT id_bill FROM Bill WHERE id_table = ? AND status = 'open' LIMIT 1", selectedTable,
             );
             if (bill) {
-              await db.runAsync("UPDATE Bill SET status = 'paid', close_at = ? WHERE id_bill = ?", new Date().toISOString(), bill.id_bill);
+              const closedAt = new Date().toISOString();
+              await db.runAsync("UPDATE Bill SET status = 'paid', close_at = ? WHERE id_bill = ?", closedAt, bill.id_bill);
+              paidBill = {
+                id: bill.id_bill, table: selectedTable, closedAt,
+                itemCount: tableOrders.reduce((sum, item) => sum + item.quantity, 0),
+                total,
+              };
             }
             await db.runAsync('DELETE FROM cart_items WHERE table_number = ?', selectedTable);
           });
           setOrders((old) => old.filter((item) => item.table !== selectedTable));
           setCart((old) => old.filter((item) => item.table !== selectedTable));
           setOpenTables((old) => old.filter((number) => number !== selectedTable));
+          if (paidBill) setBillHistory((old) => [paidBill, ...old.filter((bill) => bill.id !== paidBill.id)]);
           setSelectedTable(null);
           setPage('tables');
         } catch (error) {
@@ -223,11 +303,17 @@ function RestaurantApp() {
   const title = page === 'tables' ? 'เลือกโต๊ะของคุณ'
     : page === 'menu' ? `เมนูโต๊ะ ${selectedTable}`
     : page === 'cart' ? `ตะกร้าโต๊ะ ${selectedTable}`
-    : page === 'bill' ? `บิลโต๊ะ ${selectedTable}` : 'รายการเข้าครัว';
+    : page === 'bill' ? `บิลโต๊ะ ${selectedTable}`
+    : page === 'history-bill' ? `บิลโต๊ะ ${viewedBill?.table ?? ''}`
+    : page === 'history' ? 'ประวัติบิล'
+    : page === 'reports' ? 'รายงานยอดขาย' : 'รายการเข้าครัว';
   const subtitle = page === 'tables' ? 'เลือกโต๊ะเพื่อเริ่มสั่งอาหาร'
     : page === 'menu' ? 'อาหารอร่อย ๆ สำหรับมื้อนี้'
     : page === 'cart' ? 'ตรวจรายการก่อนส่งเข้าครัว'
-    : page === 'bill' ? 'รายการที่สั่งแล้ว แยกตามรอบ' : 'รายการที่ส่งมาก่อนจะแสดงก่อน';
+    : page === 'bill' ? 'รายการที่สั่งแล้ว แยกตามรอบ'
+    : page === 'history-bill' ? `ปิดบิลเมื่อ ${viewedBill?.closedAt ?? '-'}`
+    : page === 'history' ? 'เลือกบิลที่ชำระแล้วเพื่อดูรายละเอียด'
+    : page === 'reports' ? 'สรุปยอดขายและเมนูขายดีจากบิลที่ชำระแล้ว' : 'รายการที่ส่งมาก่อนจะแสดงก่อน';
 
   if (!databaseReady) return <View style={styles.root}><ActivityIndicator color={colors.green} /></View>;
   if (databaseError) {
@@ -240,7 +326,7 @@ function RestaurantApp() {
     <View style={styles.root}>
       <StatusBar style="dark" backgroundColor={colors.bg} />
       <Header title={title} subtitle={subtitle} />
-      {page === 'tables' && <TableScreen tables={tableRows} openTables={openTables} onSelectTable={selectTable} />}
+      {page === 'tables' && <TableScreen tables={tableRows} openTables={openTables} onSelectTable={selectTable} onViewHistory={() => setPage('history')} onViewReports={() => setPage('reports')} onResetDatabase={resetDatabase} />}
       {page === 'menu' && (
         <MenuScreen categories={categories} category={category} onChangeCategory={setCategory}
           cart={tableCart} orders={tableOrders} menuItems={menuItems}
@@ -251,6 +337,9 @@ function RestaurantApp() {
           onChangeNote={changeNote} onSendOrder={sendOrder} onChangePage={setPage} />
       )}
       {page === 'bill' && <BillScreen orders={tableOrders} onCloseBill={closeBill} onChangePage={setPage} />}
+      {page === 'history' && <BillHistoryScreen bills={billHistory} onSelectBill={openHistoricalBill} />}
+      {page === 'history-bill' && <BillScreen orders={historicalOrders} readOnly onBack={() => setPage('history')} />}
+      {page === 'reports' && <ReportsScreen />}
       {page === 'kitchen' && <KitchenScreen orders={orders} onUpdateStatus={updateStatus} />}
       <BottomTabs page={page} selectedTable={selectedTable} onChangePage={setPage} />
     </View>

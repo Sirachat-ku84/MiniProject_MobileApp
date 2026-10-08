@@ -54,6 +54,7 @@ export const styles = StyleSheet.create({
   roundTitle: { color: colors.green, fontSize: 16, fontWeight: '700', marginBottom: 7 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
   billName: { flex: 1, color: colors.text, fontSize: 14 },
+  historyMeta: { color: colors.muted, fontSize: 13, marginTop: 6 },
   kitchenMeta: { color: colors.green, fontSize: 12, fontWeight: '600' },
   kitchenName: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 7 },
   note: { color: colors.muted, fontSize: 13, marginTop: 4 },

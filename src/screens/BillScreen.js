@@ -2,7 +2,7 @@ import { ScrollView, Text, View } from 'react-native';
 import Button from '../components/Button';
 import { styles } from '../theme';
 
-export default function BillScreen({ orders, onCloseBill, onChangePage }) {
+export default function BillScreen({ orders, onCloseBill, onChangePage, readOnly = false, onBack }) {
   const rounds = [...new Set(orders.map((item) => item.round))];
   const total = orders.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -26,8 +26,12 @@ export default function BillScreen({ orders, onCloseBill, onChangePage }) {
       </ScrollView>
       <View style={styles.footer}>
         <View style={styles.row}><Text style={styles.totalLabel}>ยอดรวมทั้งบิล</Text><Text style={styles.total}>{total} บาท</Text></View>
-        <Button title="สั่งอาหารเพิ่ม" onPress={() => onChangePage('menu')} />
-        {orders.length > 0 && <Button title="ปิดบิล" secondary onPress={onCloseBill} />}
+        {readOnly ? <Button title="กลับไปประวัติบิล" onPress={onBack} /> : (
+          <>
+            <Button title="สั่งอาหารเพิ่ม" onPress={() => onChangePage('menu')} />
+            {orders.length > 0 && <Button title="ปิดบิล" secondary onPress={onCloseBill} />}
+          </>
+        )}
       </View>
     </View>
   );
