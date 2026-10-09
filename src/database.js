@@ -100,8 +100,8 @@ export async function initializeDatabase(db) {
     }
     for (const item of menu) {
       await db.runAsync(
-        'INSERT OR IGNORE INTO Menu (id_menu, name, price, id_foodcate, icon) VALUES (?, ?, ?, ?, ?)',
-        item.id, item.name, item.price, item.category, item.icon,
+        'INSERT OR REPLACE INTO Menu (id_menu, name, price, id_foodcate, icon) VALUES (?, ?, ?, ?, ?)',
+        item.id, item.name, item.price, item.category, item.uri,
       );
     }
     if (legacyMenuItems) {
@@ -144,42 +144,41 @@ export async function initializeDatabase(db) {
   });
 
   if (legacyCategories || legacyMenuItems || legacyOrderItems) {
-    const cartForeignKeys = await db.getAllAsync('PRAGMA foreign_key_list(cart_items)');
-    const cartUsesOldMenu = cartForeignKeys.some((key) => key.table === 'menu_items');
-    await db.execAsync('PRAGMA foreign_keys = OFF');
-    try {
-      await db.withTransactionAsync(async () => {
-        if (cartUsesOldMenu) {
-          await db.execAsync('ALTER TABLE cart_items RENAME TO legacy_cart_items');
-          await db.execAsync(`
-            CREATE TABLE cart_items (
-              table_number INTEGER NOT NULL REFERENCES Restaurant_tables(id_table),
-              menu_id TEXT NOT NULL REFERENCES Menu(id_menu),
-              name TEXT NOT NULL,
-              price REAL NOT NULL CHECK (price >= 0),
-              icon TEXT NOT NULL,
-              quantity INTEGER NOT NULL CHECK (quantity > 0),
-              note TEXT NOT NULL DEFAULT '',
-              PRIMARY KEY (table_number, menu_id)
-            )
-          `);
-          for (const item of oldCartItems) {
-            await db.runAsync(
-              `INSERT OR REPLACE INTO cart_items
-               (table_number, menu_id, name, price, icon, quantity, note)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              item.table_number, item.menu_id, item.name, item.price,
-              item.icon, item.quantity, item.note || '',
-            );
-          }
-          await db.execAsync('DROP TABLE legacy_cart_items');
-        }
-        await db.execAsync('DROP TABLE IF EXISTS order_items');
-        await db.execAsync('DROP TABLE IF EXISTS menu_items');
-        await db.execAsync('DROP TABLE IF EXISTS legacy_categories');
-      });
-    } finally {
-      await db.execAsync('PRAGMA foreign_keys = ON');
+  const cartForeignKeys = await db.getAllAsync('PRAGMA foreign_key_list(cart_items)');
+  const cartUsesOldMenu = cartForeignKeys.some((key) => key.table === 'menu_items');
+  await db.execAsync('PRAGMA foreign_keys = OFF');
+  try {
+    await db.execAsync(`
+      DROP TABLE IF EXISTS cart_items;
+      CREATE TABLE IF NOT EXISTS cart_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_number TEXT,
+        menu_id TEXT,
+        name TEXT,
+        price REAL,
+        icon TEXT,
+        quantity INTEGER,
+        note TEXT,
+        UNIQUE(table_number, menu_id)
+      );
+    `);
+    for (const item of oldCartItems) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO cart_items
+        (table_number, menu_id, name, price, icon, quantity, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        item.table_number, item.menu_id, item.name, item.price,
+        item.icon, item.quantity, item.note || '',
+      );
     }
+    await db.execAsync('DROP TABLE legacy_cart_items');
+    await db.execAsync('DROP TABLE IF EXISTS order_items');
+    await db.execAsync('DROP TABLE IF EXISTS menu_items');
+    await db.execAsync('DROP TABLE IF EXISTS legacy_categories');
+  } catch (error) {
+    console.error('Migration error:', error);
+  } finally {
+    await db.execAsync('PRAGMA foreign_keys = ON');
+  }
   }
 }

@@ -1,18 +1,23 @@
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Button from '../components/Button';
 import { styles } from '../theme';
 
 export default function CartScreen({ cart, onChangeQuantity, onChangeNote, onSendOrder, onChangePage }) {
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const uniqueCart = cart.filter((item, index, self) =>
+    index === self.findIndex((t) => t.table === item.table && t.menuId === item.menuId)
+  );
+
+  const total = uniqueCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <View style={styles.body}>
       <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-        {cart.length === 0 && <Text style={styles.empty}>ยังไม่มีอาหารในตะกร้า</Text>}
-        {cart.map((item) => (
-          <View key={item.menuId} style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.itemName}>{item.icon}  {item.name}</Text>
+        {uniqueCart.length === 0 && <Text style={styles.empty}>ยังไม่มีอาหารในตะกร้า</Text>}
+        {uniqueCart.map((item) => (
+          <View key={`${item.table}-${item.menuId}`} style={styles.card}>
+            <View style={[styles.row, { alignItems: 'center' }]}>
+              <Image source={{ uri: item.uri }} style={styles.foodImage} />
+              <Text style={[styles.itemName, { marginLeft: 10 }]}>{item.name}</Text>
               <Text style={styles.amount}>{item.price * item.quantity} บาท</Text>
             </View>
             <View style={styles.quantityRow}>
@@ -37,7 +42,7 @@ export default function CartScreen({ cart, onChangeQuantity, onChangeNote, onSen
       </ScrollView>
       <View style={styles.footer}>
         <View style={styles.row}><Text style={styles.totalLabel}>รวมในตะกร้า</Text><Text style={styles.total}>{total} บาท</Text></View>
-        <Button title="ยืนยันและส่งเข้าครัว" onPress={onSendOrder} disabled={cart.length === 0} />
+        <Button title="ยืนยันและส่งเข้าครัว" onPress={onSendOrder} disabled={uniqueCart.length === 0} />
         <Button title="เลือกอาหารเพิ่ม" secondary onPress={() => onChangePage('menu')} />
       </View>
     </View>

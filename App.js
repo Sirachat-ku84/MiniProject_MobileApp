@@ -13,6 +13,7 @@ import ReportsScreen from './src/screens/ReportsScreen';
 import TableScreen from './src/screens/TableScreen';
 import { colors, styles } from './src/theme';
 import { initializeDatabase } from './src/database';
+import { menu as staticMenu } from './src/data';
 
 function RestaurantApp() {
   const db = useSQLiteContext();
@@ -38,7 +39,7 @@ function RestaurantApp() {
         const [savedOrders, savedMenu, savedCategories, savedCart, savedBills, savedTables, savedHistory] = await Promise.all([
           db.getAllAsync(`
             SELECT d.id_detail AS id, b.id_table AS "table", d.id_menu AS menuId,
-              m.name, d.unit_price AS price, m.icon, d.quantity, d.note,
+              m.name, d.unit_price AS price, m.icon AS uri, d.quantity, d.note,
               r.round_number AS round, d.status, d.id_round AS roundId,
               CASE WHEN length(r.order_at) >= 16 THEN substr(r.order_at, 12, 5) ELSE r.order_at END AS time
             FROM Order_Detail d
@@ -48,9 +49,9 @@ function RestaurantApp() {
             WHERE b.status = 'open'
             ORDER BY r.order_at, d.rowid
           `),
-          db.getAllAsync('SELECT id_menu AS id, id_foodcate AS category, name, price, icon FROM Menu ORDER BY rowid'),
+          db.getAllAsync('SELECT id_menu AS id, id_foodcate AS category, name, price, icon AS uri FROM Menu ORDER BY rowid'),
           db.getAllAsync('SELECT id_foodcate AS id, name FROM Categories ORDER BY rowid'),
-          db.getAllAsync('SELECT table_number AS "table", menu_id AS menuId, name, price, icon, quantity, note FROM cart_items ORDER BY table_number, rowid'),
+          db.getAllAsync('SELECT table_number AS "table", menu_id AS menuId, name, price, icon AS uri, quantity, note FROM cart_items ORDER BY table_number, rowid'),
           db.getAllAsync("SELECT id_table AS table_number FROM Bill WHERE status = 'open' ORDER BY id_table"),
           db.getAllAsync('SELECT id_table AS id, seat FROM Restaurant_tables ORDER BY id_table'),
           db.getAllAsync(`
@@ -97,24 +98,36 @@ function RestaurantApp() {
   }
 
   async function addFood(food) {
-    const found = tableCart.find((item) => item.menuId === food.id);
-    const quantity = (found?.quantity ?? 0) + 1;
+    // รวมจำนวนเดิมที่มีอยู่ในตะกร้าของโต๊ะนี้และเมนูนี้
+    const existingItems = cart.filter((item) => item.table === selectedTable && item.menuId === food.id);
+    const currentTotalQty = existingItems.reduce((sum, i) => sum + i.quantity, 0);
+    const newQty = currentTotalQty + 1;
+
     try {
+      // ลบข้อมูลเก่าที่ซ้ำกันของโต๊ะนี้และเมนูนี้ใน SQLite ออกให้หมดก่อน
+      await db.runAsync(
+        'DELETE FROM cart_items WHERE table_number = ? AND menu_id = ?',
+        selectedTable, food.id
+      );
+
+      // บันทึกรายการใหม่ลงไปเพียง 1 แถวด้วยจำนวนที่ถูกต้อง
       await db.runAsync(
         `INSERT INTO cart_items (table_number, menu_id, name, price, icon, quantity, note)
-         VALUES (?, ?, ?, ?, ?, ?, '')
-         ON CONFLICT(table_number, menu_id) DO UPDATE SET quantity = excluded.quantity`,
-        selectedTable, food.id, food.name, food.price, food.icon, quantity,
+        VALUES (?, ?, ?, ?, ?, ?, '')`,
+        selectedTable, food.id, food.name, food.price, food.uri, newQty
       );
-      setCart((old) => found
-        ? old.map((item) => item.table === selectedTable && item.menuId === food.id ? { ...item, quantity } : item)
-        : [...old, { table: selectedTable, menuId: food.id, name: food.name, price: food.price, icon: food.icon, quantity, note: '' }]);
+
+      // อัปเดต State ในหน้าจอไม่ให้มีรายการซ้ำซ้อน
+      setCart((old) => [
+        ...old.filter((item) => !(item.table === selectedTable && item.menuId === food.id)),
+        { table: selectedTable, menuId: food.id, name: food.name, price: food.price, uri: food.uri, quantity: newQty, note: '' }
+      ]);
     } catch (error) {
       console.error('Failed to add cart item', error);
       Alert.alert('เพิ่มรายการไม่สำเร็จ', 'บันทึกรายการลงฐานข้อมูลไม่ได้');
     }
   }
-
+  
   async function changeQuantity(menuId, difference) {
     const item = tableCart.find((entry) => entry.menuId === menuId);
     if (!item) return;
