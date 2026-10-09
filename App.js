@@ -98,26 +98,20 @@ function RestaurantApp() {
   }
 
   async function addFood(food) {
-    // รวมจำนวนเดิมที่มีอยู่ในตะกร้าของโต๊ะนี้และเมนูนี้
     const existingItems = cart.filter((item) => item.table === selectedTable && item.menuId === food.id);
     const currentTotalQty = existingItems.reduce((sum, i) => sum + i.quantity, 0);
     const newQty = currentTotalQty + 1;
 
     try {
-      // ลบข้อมูลเก่าที่ซ้ำกันของโต๊ะนี้และเมนูนี้ใน SQLite ออกให้หมดก่อน
       await db.runAsync(
         'DELETE FROM cart_items WHERE table_number = ? AND menu_id = ?',
         selectedTable, food.id
       );
-
-      // บันทึกรายการใหม่ลงไปเพียง 1 แถวด้วยจำนวนที่ถูกต้อง
       await db.runAsync(
         `INSERT INTO cart_items (table_number, menu_id, name, price, icon, quantity, note)
         VALUES (?, ?, ?, ?, ?, ?, '')`,
         selectedTable, food.id, food.name, food.price, food.uri, newQty
       );
-
-      // อัปเดต State ในหน้าจอไม่ให้มีรายการซ้ำซ้อน
       setCart((old) => [
         ...old.filter((item) => !(item.table === selectedTable && item.menuId === food.id)),
         { table: selectedTable, menuId: food.id, name: food.name, price: food.price, uri: food.uri, quantity: newQty, note: '' }
