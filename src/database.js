@@ -39,6 +39,7 @@ export async function initializeDatabase(db) {
       open_at TEXT NOT NULL,
       close_at TEXT,
       status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'paid')),
+      total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0),
       id_table INTEGER NOT NULL REFERENCES Restaurant_tables(id_table)
     );
     CREATE UNIQUE INDEX IF NOT EXISTS bill_one_open_per_table_idx
@@ -71,6 +72,23 @@ export async function initializeDatabase(db) {
       PRIMARY KEY (table_number, menu_id)
     );
   `);
+
+  const billColumns = await db.getAllAsync('PRAGMA table_info(Bill)');
+  if (!billColumns.some((column) => column.name === 'total_price')) {
+    await db.execAsync('ALTER TABLE Bill ADD COLUMN total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0)');
+    await db.runAsync(`
+      UPDATE Bill
+      SET total_price = COALESCE((
+        SELECT SUM(d.quantity * d.unit_price)
+        FROM Order_Round r
+        JOIN Order_Detail d ON d.id_round = r.id_round
+        WHERE r.id_bill = Bill.id_bill
+      ), 0)
+    `);
+  }
+  if (billColumns.some((column) => column.name === 'total_food')) {
+    await db.execAsync('ALTER TABLE Bill DROP COLUMN total_food');
+  }
 
   const legacyOrderItems = await tableExists(db, 'order_items');
   const legacyMenuItems = await tableExists(db, 'menu_items');

@@ -57,7 +57,7 @@ function RestaurantApp() {
           db.getAllAsync(`
             SELECT b.id_bill AS id, b.id_table AS "table", b.open_at AS openedAt,
               b.close_at AS closedAt, COALESCE(SUM(d.quantity), 0) AS itemCount,
-              COALESCE(SUM(d.quantity * d.unit_price), 0) AS total
+              b.total_price AS total
             FROM Bill b
             LEFT JOIN Order_Round r ON r.id_bill = b.id_bill
             LEFT JOIN Order_Detail d ON d.id_round = r.id_round
@@ -192,6 +192,8 @@ function RestaurantApp() {
           item.round = submittedRound;
           item.roundId = roundId;
         }
+        const submittedTotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        await db.runAsync('UPDATE Bill SET total_price = total_price + ? WHERE id_bill = ?', submittedTotal, bill.id_bill);
         await db.runAsync('DELETE FROM cart_items WHERE table_number = ?', selectedTable);
       });
     } catch (error) {
@@ -284,7 +286,10 @@ function RestaurantApp() {
             );
             if (bill) {
               const closedAt = new Date().toISOString();
-              await db.runAsync("UPDATE Bill SET status = 'paid', close_at = ? WHERE id_bill = ?", closedAt, bill.id_bill);
+              await db.runAsync(
+                "UPDATE Bill SET status = 'paid', close_at = ?, total_price = ? WHERE id_bill = ?",
+                closedAt, total, bill.id_bill,
+              );
               paidBill = {
                 id: bill.id_bill, table: selectedTable, closedAt,
                 itemCount: tableOrders.reduce((sum, item) => sum + item.quantity, 0),
