@@ -67,6 +67,23 @@ export async function initializeDatabase(db) {
     );
   `);
 
+  // CREATE TABLE IF NOT EXISTS does not add columns to a database already on the device.
+  const billColumns = await db.getAllAsync('PRAGMA table_info(Bill)');
+  if (!billColumns.some((column) => column.name === 'total_price')) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync('ALTER TABLE Bill ADD COLUMN total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0)');
+      await db.runAsync(`
+        UPDATE Bill
+        SET total_price = COALESCE((
+          SELECT SUM(d.quantity * d.unit_price)
+          FROM Order_Round r
+          JOIN Order_Detail d ON d.id_round = r.id_round
+          WHERE r.id_bill = Bill.id_bill
+        ), 0)
+      `);
+    });
+  }
+
   await db.withTransactionAsync(async () => {
     for (let table = 1; table <= 15; table += 1) {
       await db.runAsync('INSERT OR IGNORE INTO Restaurant_tables (id_table, seat) VALUES (?, ?)', table, 4);
