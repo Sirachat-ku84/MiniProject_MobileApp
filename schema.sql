@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS Bill (
   open_at TEXT NOT NULL,
   close_at TEXT,
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'paid')),
+  total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0),
   id_table INTEGER NOT NULL REFERENCES Restaurant_tables(id_table)
 );
 
