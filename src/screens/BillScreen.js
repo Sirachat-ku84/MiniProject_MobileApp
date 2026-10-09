@@ -1,8 +1,8 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import Button from '../components/Button';
 import { styles } from '../theme';
 
-export default function BillScreen({ orders, onCloseBill, onChangePage, readOnly = false, onBack }) {
+export default function BillScreen({ orders, onCloseBill, onChangePage }) {
   const rounds = [...new Set(orders.map((item) => item.round))];
   const total = orders.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -14,8 +14,9 @@ export default function BillScreen({ orders, onCloseBill, onChangePage, readOnly
           <View key={round} style={styles.card}>
             <Text style={styles.roundTitle}>รอบที่ {round}</Text>
             {orders.filter((item) => item.round === round).map((item) => (
-              <View key={item.id} style={styles.billRow}>
-                <Text style={styles.billName}>
+              <View key={item.id} style={[styles.billRow, { alignItems: 'center' }]}>
+                <Image source={{ uri: item.uri }} style={styles.billFoodImage} />
+                <Text style={[styles.billName, { marginLeft: 10 }]}>
                   {item.name} × {item.quantity}{'\n'}{item.price} บาท / จาน{item.note ? `\n${item.note}` : ''}
                 </Text>
                 <Text style={styles.amount}>{item.price * item.quantity} บาท</Text>
@@ -26,12 +27,8 @@ export default function BillScreen({ orders, onCloseBill, onChangePage, readOnly
       </ScrollView>
       <View style={styles.footer}>
         <View style={styles.row}><Text style={styles.totalLabel}>ยอดรวมทั้งบิล</Text><Text style={styles.total}>{total} บาท</Text></View>
-        {readOnly ? <Button title="กลับไปประวัติบิล" onPress={onBack} /> : (
-          <>
-            <Button title="สั่งอาหารเพิ่ม" onPress={() => onChangePage('menu')} />
-            {orders.length > 0 && <Button title="ปิดบิล" secondary onPress={onCloseBill} />}
-          </>
-        )}
+        <Button title="สั่งอาหารเพิ่ม" onPress={() => onChangePage('menu')} />
+        {orders.length > 0 && <Button title="ปิดบิล" secondary onPress={onCloseBill} />}
       </View>
     </View>
   );

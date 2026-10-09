@@ -1,4 +1,4 @@
-import { FlatList, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Button from '../components/Button';
 import { styles } from '../theme';
 
@@ -20,7 +20,7 @@ export default function MenuScreen({ categories, category, onChangeCategory, car
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={styles.menuCard}>
-            <Text style={styles.foodIcon}>{item.icon}</Text>
+            <Image source={{ uri: item.uri }} style={styles.foodImage} />
             <View style={styles.foodInfo}>
               <Text style={styles.foodName}>{item.name}</Text>
               <Text style={styles.price}>{item.price} บาท</Text>

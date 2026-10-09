@@ -54,7 +54,6 @@ export const styles = StyleSheet.create({
   roundTitle: { color: colors.green, fontSize: 16, fontWeight: '700', marginBottom: 7 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
   billName: { flex: 1, color: colors.text, fontSize: 14 },
-  historyMeta: { color: colors.muted, fontSize: 13, marginTop: 6 },
   kitchenMeta: { color: colors.green, fontSize: 12, fontWeight: '600' },
   kitchenName: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 7 },
   note: { color: colors.muted, fontSize: 13, marginTop: 4 },
@@ -65,4 +64,6 @@ export const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, paddingVertical: 8 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8 }, tabText: { color: colors.muted, fontSize: 13 },
   activeTab: { color: colors.green, fontWeight: '700' },
+  tableImage: {width: 36,height: 36,resizeMode: 'contain',marginBottom: 4,},
+  foodImage: {width: 52,height: 52,borderRadius: 13,backgroundColor: '#F4EDE3',resizeMode: 'cover',},
 });
